@@ -195,6 +195,8 @@ function mediaItem(entry) {
     poster: poster || src,
     caption,
     alt: str(raw.alt) || caption,
+    /* Nominates this shot as the card background — see normalizeMedia. */
+    cover: raw.cover === true,
   };
 }
 
@@ -222,7 +224,18 @@ function normalizeMedia(p) {
   const videos = items.filter((m) => m.kind === 'video');
   const images = items.filter((m) => m.kind === 'image');
 
-  return { items: [...videos, ...images], videos: videos.length, images: images.length };
+  /* The card falls back to the first still, but a `cover: true` shot wins —
+     so reordering an eight-item gallery can't silently change the card. Its
+     `poster` is taken rather than `src` because that is the card-sized
+     variant, and reusing it means the strip and the card share one request. */
+  const cover = images.find((m) => m.cover) || images[0];
+
+  return {
+    items: [...videos, ...images],
+    videos: videos.length,
+    images: images.length,
+    cover: cover?.poster || '',
+  };
 }
 
 /* -------------------------------------------------------------- projects -- */
@@ -261,8 +274,11 @@ function normalizeProjects(list, categoryLabels) {
       description,
       fullDescription: fullDescription || description,
       icon: str(p.image),
-      /* No imgBg still gets a card poster if the gallery holds a still. */
-      cover: str(p.imgBg) || media.items.find((m) => m.kind === 'image')?.src || '',
+      /* Card background only — the viewer reads `media`. imgBg goes through the
+         media resolver so it accepts a Drive share link, not just a repo path,
+         and is asked for at card size. Leave it empty to hand the card to the
+         gallery; with neither, the card falls back to the icon. */
+      cover: directImageUrl(safeMediaSrc(p.imgBg), 'w640') || media.cover || '',
       media: media.items,
       mediaCounts: { videos: media.videos, images: media.images },
       technologies,

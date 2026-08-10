@@ -97,12 +97,15 @@ export function posterFor(url) {
 /**
  * Drive's /view and /preview URLs are HTML pages, not bitmaps, so they cannot
  * go in an <img src>. The thumbnail endpoint serves the actual file and is the
- * only Drive form that renders inline; asking for a wide size gets something
- * usable full-bleed rather than a 220px sprite.
+ * only Drive form that renders inline.
+ *
+ * `size` matters: the default suits a full-bleed stage, but a 640x400 project
+ * card gets a pixel-identical result from `w640` at roughly a quarter of the
+ * bytes, so the card path asks for that instead.
  */
-export function directImageUrl(url) {
+export function directImageUrl(url, size = 'w1600') {
   const drive = driveId(url);
-  return drive ? `https://drive.google.com/thumbnail?id=${drive}&sz=w1600` : str(url);
+  return drive ? `https://drive.google.com/thumbnail?id=${drive}&sz=${size}` : str(url);
 }
 
 /* -------------------------------------------------------------- kind/src -- */

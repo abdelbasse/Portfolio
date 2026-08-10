@@ -417,11 +417,11 @@
       "categories": ["ai", "web"],
       "description": "Sovereign clinical assistant grounding every answer in PubMed literature",
       "image": "fas fa-brain",
-      "imgBg": "data/src/imgs/projects/default.png",
+      "imgBg": "",
       "media": [
         { "type": "video", "src": "https://drive.google.com/file/d/1axPZ79wawjcShgSe70gtwIyOVndo3XmT/view?usp=drive_link", "caption": "MedVise walkthrough — PubMed-grounded answers with inline citations" },
         { "type": "video", "src": "https://drive.google.com/file/d/13kNx-Hr9MjBL3DWKEus08l2yGYjkx8LT/view?usp=drive_link", "caption": "DICOM study viewer with per-organ segmentation" },
-        { "type": "image", "src": "https://drive.google.com/file/d/1CTXyKqo0uArHrl9YnDD6cYZMn_ePt7gN/view", "caption": "Answers grounded in PubMed literature with inline numbered citations" },
+        { "type": "image", "cover": true, "src": "https://drive.google.com/file/d/1CTXyKqo0uArHrl9YnDD6cYZMn_ePt7gN/view", "caption": "Answers grounded in PubMed literature with inline numbered citations" },
         { "type": "image", "src": "https://drive.google.com/file/d/1gpheIW1DwSoVFgtKM5fO9kFxjNGshRmy/view", "caption": "Retrieval filters narrowing the evidence an answer is drawn from" },
         { "type": "image", "src": "https://drive.google.com/file/d/1bo03vz88HEIFQgAe3l6vLT7kHskKxYsA/view", "caption": "Embeddable widget running inside Pratisoft" },
         { "type": "image", "src": "https://drive.google.com/file/d/1K1TxwXYasuBTa2m08W9M4ke8jAwWTBfr/view", "caption": "Admin console — per-account usage metering" },
@@ -454,7 +454,7 @@
       "categories": ["web"],
       "description": "Electronic health-claim filing to Morocco's national social security system",
       "image": "fas fa-briefcase",
-      "imgBg": "data/src/imgs/projects/default.png",
+      "imgBg": "",
       "media": [
         { "type": "image", "src": "https://drive.google.com/file/d/1JdoZ2Hvgpsjd_DQ7R_NXHEzV78mZVLOE/view", "caption": "Electronic claim filing inside the Pratisoft workflow" }
       ],
@@ -482,7 +482,7 @@
       "categories": ["tools"],
       "description": "CLI that turns a JSON API spec into a ready-to-use Python client library",
       "image": "fas fa-tools",
-      "imgBg": "data/src/imgs/projects/default.png",
+      "imgBg": "",
       "media": [
         { "type": "image", "src": "https://drive.google.com/file/d/1sqgaRnGZZ7bi_-BLH29aNULRyImlPDbQ/view", "caption": "Generating a Python client from a JSON API specification" }
       ],

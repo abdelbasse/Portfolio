@@ -179,7 +179,7 @@ ignored.
 | `categories` | Drives the **Type** filter chips. Give them readable names via `categoryLabels` (below), otherwise the slug gets title-cased. A legacy single `category` string still works. |
 | `technologies` | Drives the **Tech** filter chips *and* search. The chips are ranked by how often a technology appears. |
 | `slug` | Optional — the shareable `#project/<slug>` link. Derived from the title when omitted, so only set it if you want a shorter URL. |
-| `imgBg` | Card cover image. Falls back to the first image in `media`, then to the `image` icon if both are empty or broken. |
+| `imgBg` | **Card** background only — the detail panel reads `media`. Accepts a repo path, a Google Drive share link, or any `https://` image URL. **Leave it empty to let the gallery supply the card image** (see *Which image becomes the card* below). |
 | `media` | The gallery in the detail panel — see below. |
 | `year` | Optional. **The "Newest" sort option only appears once at least one project has a year** — otherwise it would silently duplicate "Featured". |
 | `featured` | `true` floats it to the top under the default sort. |
@@ -209,6 +209,24 @@ cover with no strip, which is what every project without `media` gets.
 | `type` | `"video"` or `"image"`. Optional — a file extension or a known video host decides it. **A Google Drive link can be either, so an undeclared one is treated as a video; set `"type": "image"` for Drive screenshots.** |
 | `caption` | Optional. Shows under the stage, labels the thumbnail, and is searchable. |
 | `poster` | Optional thumbnail override. YouTube and Drive posters are derived automatically; a repo video file has none, so give it one or the strip shows a play icon. |
+| `cover` | `true` on one **image** pins it as the project's card background. Ignored on videos — a card needs a bitmap. |
+
+#### Which image becomes the card
+
+Highest wins:
+
+```
+imgBg  →  media item with "cover": true  →  first image in media  →  the `image` icon
+```
+
+So a project with a single screenshot needs no configuration at all: clear its
+`imgBg` and that shot becomes the card. Use `"cover": true` when a gallery has
+several stills and you want a specific one on the card regardless of how you
+reorder the array later.
+
+Drive images are fetched at `w640` for the card and `w1600` for the panel stage,
+so a card doesn't pull a 600 KB screenshot to render it 640 px wide. The card and
+the strip thumbnail share the same URL, and therefore one request.
 
 Sources that work:
 
