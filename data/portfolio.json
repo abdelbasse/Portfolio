@@ -419,8 +419,8 @@
       "image": "fas fa-brain",
       "imgBg": "data/src/imgs/projects/default.png",
       "media": [
-        { "type": "video", "src": "https://drive.google.com/file/d/13kNx-Hr9MjBL3DWKEus08l2yGYjkx8LT/view?usp=drive_link", "caption": "MedVise walkthrough — PubMed-grounded answers with inline citations" },
-        { "type": "video", "src": "https://drive.google.com/file/d/1axPZ79wawjcShgSe70gtwIyOVndo3XmT/view?usp=drive_link", "caption": "DICOM study viewer with per-organ segmentation" }
+        { "type": "video", "src": "https://drive.google.com/file/d/1axPZ79wawjcShgSe70gtwIyOVndo3XmT/view?usp=drive_link", "caption": "MedVise walkthrough — PubMed-grounded answers with inline citations" },
+        { "type": "video", "src": "https://drive.google.com/file/d/13kNx-Hr9MjBL3DWKEus08l2yGYjkx8LT/view?usp=drive_link", "caption": "DICOM study viewer with per-organ segmentation" }
       ],
       "technologies": ["MedGemma", "vLLM", "RAG", "FastAPI", "Python", "Angular", "TypeScript", "PostgreSQL", "pgvector", "Redis", "MinIO", "Docker", "Jenkins", "PubMed API", "DICOM", "TotalSegmentator"],
       "fullDescription": "End-of-studies project at Distamed. General-purpose chatbots hallucinate, rarely cite sources, and process data on foreign clouds — which Moroccan law 09-08 forbids for patient information. MedVise is a self-hosted medical conversational assistant that keeps every model, database and file on company hardware inside the country. It pairs the open-weight MedGemma model with a retrieval-augmented generation pipeline that grounds each answer in PubMed literature and returns the supporting citations. It reaches users as a doctor web application, an admin console, and an embeddable widget integrated into Pratisoft.",
