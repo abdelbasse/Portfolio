@@ -156,6 +156,10 @@ ignored.
   "fullDescription": "The longer version for the detail panel.",
   "image": "fas fa-store",
   "imgBg": "data/src/imgs/projects/default.png",
+  "media": [
+    { "type": "video", "src": "https://youtu.be/XXXXXXXXXXX", "caption": "Two-minute walkthrough" },
+    { "type": "image", "src": "data/src/imgs/projects/retailvision/dashboard.png", "caption": "Live dashboard" }
+  ],
   "technologies": ["YOLOv8", "Spark", "Kafka"],
   "features": ["Feature one", "Feature two"],
   "githubLink": "",
@@ -175,10 +179,43 @@ ignored.
 | `categories` | Drives the **Type** filter chips. Give them readable names via `categoryLabels` (below), otherwise the slug gets title-cased. A legacy single `category` string still works. |
 | `technologies` | Drives the **Tech** filter chips *and* search. The chips are ranked by how often a technology appears. |
 | `slug` | Optional — the shareable `#project/<slug>` link. Derived from the title when omitted, so only set it if you want a shorter URL. |
-| `imgBg` | Card and panel cover image. Falls back to the `image` icon if empty or broken. |
+| `imgBg` | Card cover image. Falls back to the first image in `media`, then to the `image` icon if both are empty or broken. |
+| `media` | The gallery in the detail panel — see below. |
 | `year` | Optional. **The "Newest" sort option only appears once at least one project has a year** — otherwise it would silently duplicate "Featured". |
 | `featured` | `true` floats it to the top under the default sort. |
-| `demoVideo` | YouTube, Vimeo, or a Google Drive share link — embedded automatically. Anything else falls back to the cover image. |
+| `demoVideo` | YouTube, Vimeo, or a Google Drive share link — embedded automatically. Only used when `media` is empty; prefer `media` for anything new. |
+
+### `projects[].media` — the gallery
+
+Optional. Give a project a list of screenshots and clips and the detail panel
+grows a thumbnail strip under the stage, with a count so a visitor can see how
+much there is before clicking. **Videos are always listed before images**,
+keeping the order you wrote inside each group. One item renders as a plain
+cover with no strip, which is what every project without `media` gets.
+
+```json
+"media": [
+  { "type": "video", "src": "https://youtu.be/XXXXXXXXXXX", "caption": "Walkthrough" },
+  { "type": "video", "src": "https://drive.google.com/file/d/<ID>/view" },
+  { "type": "video", "src": "data/src/vids/demo.mp4", "poster": "data/src/imgs/projects/x/poster.png" },
+  { "type": "image", "src": "data/src/imgs/projects/x/shot-1.png", "caption": "Admin console" },
+  { "type": "image", "src": "https://drive.google.com/file/d/<ID>/view" }
+]
+```
+
+| Field | Notes |
+|---|---|
+| `src` | Required. A repo-relative path, or an `https://` URL. Anything with another scheme (`javascript:`, `data:`) is dropped. A bare string entry is treated as `{ "src": … }`. |
+| `type` | `"video"` or `"image"`. Optional — a file extension or a known video host decides it. **A Google Drive link can be either, so an undeclared one is treated as a video; set `"type": "image"` for Drive screenshots.** |
+| `caption` | Optional. Shows under the stage, labels the thumbnail, and is searchable. |
+| `poster` | Optional thumbnail override. YouTube and Drive posters are derived automatically; a repo video file has none, so give it one or the strip shows a play icon. |
+
+Sources that work:
+
+- **Repo files** — `data/src/imgs/…` for stills, `data/src/vids/….mp4` for clips. Committed video ships in the repo, so keep it small; there's no LFS here.
+- **YouTube** — any `youtu.be`, `watch?v=`, `/shorts/` or `/embed/` link.
+- **Google Drive** — the ordinary `…/file/d/<ID>/view` share link. **Set the file to "Anyone with the link — Viewer" first**, or visitors get a sign-in wall instead of the video and the thumbnail won't load.
+- **Vimeo** — plays fine, but has no static thumbnail, so give it a `poster`.
 
 ## `categoryLabels`
 

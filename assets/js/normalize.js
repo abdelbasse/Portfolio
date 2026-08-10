@@ -8,6 +8,7 @@
  */
 
 import { fold, slugify, titleCase } from './dom.js';
+import { embedUrl, posterFor, directImageUrl, inferKind, safeMediaSrc } from './media.js';
 
 const str = (v, fallback = '') => (typeof v === 'string' ? v.trim() : v == null ? fallback : String(v));
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== '') : []);
@@ -154,6 +155,76 @@ function normalizeCertification(cert = {}, index = 0) {
   };
 }
 
+/* ----------------------------------------------------------------- media -- */
+
+/**
+ * One gallery entry, resolved to something renderable.
+ *
+ * `render` is what the viewer switches on: 'embed' for a hosted player in an
+ * iframe, 'file' for a video committed to the repo, 'image' for a bitmap.
+ * `poster` is the strip thumbnail and may be empty, in which case the viewer
+ * draws an icon tile instead.
+ */
+function mediaItem(entry) {
+  const raw = entry && typeof entry === 'object' ? entry : { src: entry };
+  const source = safeMediaSrc(raw.src ?? raw.url ?? raw.href);
+  if (!source) return null;
+
+  const caption = str(raw.caption ?? raw.title);
+  const poster = safeMediaSrc(raw.poster) || posterFor(source);
+
+  if (inferKind(source, raw.type) === 'video') {
+    const embed = embedUrl(source);
+    return {
+      kind: 'video',
+      render: embed ? 'embed' : 'file',
+      src: embed || source,
+      href: source,
+      poster,
+      caption,
+      alt: caption,
+    };
+  }
+
+  const src = directImageUrl(source);
+  return {
+    kind: 'image',
+    render: 'image',
+    src,
+    href: source,
+    poster: poster || src,
+    caption,
+    alt: str(raw.alt) || caption,
+  };
+}
+
+/**
+ * Projects predating `media` carry a demo link and a cover image instead. The
+ * demo only becomes an item if it is genuinely embeddable — the old viewer
+ * fell back to the cover when it wasn't, and an unembeddable link would
+ * otherwise end up as a <video> pointed at an HTML page.
+ */
+function fallbackMedia(p) {
+  const demo = safeMediaSrc(p.demoVideo);
+  const cover = safeMediaSrc(p.imgBg);
+
+  return [
+    demo && embedUrl(demo) ? mediaItem({ type: 'video', src: demo }) : null,
+    cover ? mediaItem({ type: 'image', src: cover }) : null,
+  ].filter(Boolean);
+}
+
+function normalizeMedia(p) {
+  const declared = arr(p.media).map(mediaItem).filter(Boolean);
+  const items = declared.length ? declared : fallbackMedia(p);
+
+  /* Videos lead, images follow; authored order holds inside each group. */
+  const videos = items.filter((m) => m.kind === 'video');
+  const images = items.filter((m) => m.kind === 'image');
+
+  return { items: [...videos, ...images], videos: videos.length, images: images.length };
+}
+
 /* -------------------------------------------------------------- projects -- */
 
 function normalizeProjects(list, categoryLabels) {
@@ -178,6 +249,7 @@ function normalizeProjects(list, categoryLabels) {
     const features = strArr(p.features);
     const description = str(p.description);
     const fullDescription = str(p.fullDescription);
+    const media = normalizeMedia(p);
 
     return {
       index,
@@ -189,7 +261,10 @@ function normalizeProjects(list, categoryLabels) {
       description,
       fullDescription: fullDescription || description,
       icon: str(p.image),
-      cover: str(p.imgBg),
+      /* No imgBg still gets a card poster if the gallery holds a still. */
+      cover: str(p.imgBg) || media.items.find((m) => m.kind === 'image')?.src || '',
+      media: media.items,
+      mediaCounts: { videos: media.videos, images: media.images },
       technologies,
       features,
       year: Number(p.year) || yearOf(p.year) || 0,
@@ -212,7 +287,8 @@ function normalizeProjects(list, categoryLabels) {
       /* Precomputed once so filtering never re-folds strings per keystroke. */
       haystack: fold(
         [title, description, fullDescription, technologies.join(' '), features.join(' '),
-          categories.join(' '), categories.map((c) => categoryLabels[c] || '').join(' ')].join(' '),
+          categories.join(' '), categories.map((c) => categoryLabels[c] || '').join(' '),
+          media.items.map((m) => m.caption).join(' ')].join(' '),
       ),
       titleFold: fold(title),
       techFold: fold(technologies.join(' ')),

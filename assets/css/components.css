@@ -55,6 +55,8 @@
 .navlist {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: var(--space-xs);
   list-style: none;
   padding: 0;
@@ -110,22 +112,99 @@
   transition: transform 80ms linear;
 }
 
-@media (max-width: 52rem) {
+/* The hamburger takes over at 60rem rather than 52rem: between roughly 833px
+   and 855px the horizontal .navlist no longer fits, and body's overflow-x:
+   hidden swallowed the overflowing links without a scrollbar to reveal it. */
+@media (max-width: 60rem) {
+  /* 68px of a 667px phone viewport is too much bar, and scroll-padding-top
+     compounds it on every anchor jump. */
+  :root { --topbar-h: 3.5rem; }
+
   .topbar__menu { display: grid; }
+
+  /* The auto margin moves to the tools here: .topbar__nav leaves flex flow
+     below this width, so its own margin stops pushing anything to the edge
+     and the buttons were left stranded mid-bar. */
+  .topbar__tools {
+    margin-inline-start: auto;
+    gap: var(--space-2xs);
+  }
+
+  /* 44px minimum touch target on the chrome buttons. */
+  .topbar .iconbtn,
+  .viewer__bar .iconbtn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .viewer__gallerynav .iconbtn--sm { width: 2.5rem; height: 2.5rem; }
+
+  /* A sheet, not a dropdown. It cannot be position: fixed — .topbar carries a
+     backdrop-filter, which makes it the containing block for fixed
+     descendants — so it is positioned against the sticky bar and sized to
+     whatever viewport is left below it. */
   .topbar__nav {
     position: absolute;
     inset-inline: 0;
     top: 100%;
-    background: var(--paper-raised);
-    border-block: 1px solid var(--rule);
-    box-shadow: var(--shadow-md);
-    padding: var(--space-xs) var(--gutter) var(--space-m);
+    height: calc(100dvh - var(--topbar-h) - 2px);
+    margin-inline-start: 0;
+    padding: var(--space-s) var(--gutter) var(--space-2xl);
+    background: var(--paper);
+    border-top: 1px solid var(--rule);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     display: none;
   }
+
   .topbar__nav[data-open="true"] { display: block; }
-  .navlist { flex-direction: column; align-items: stretch; gap: 0; }
-  .navlist a { padding: 0.7rem 0.5rem; border-radius: 0; }
+
+  .navlist {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  .navlist a {
+    display: flex;
+    align-items: center;
+    min-height: 3.25rem;
+    padding-inline: var(--space-3xs);
+    border-radius: 0;
+    font-size: var(--step-1);
+    color: var(--ink);
+  }
+
+  .navlist a::after {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    margin-inline-start: auto;
+    border-top: 1.5px solid var(--ink-faint);
+    border-right: 1.5px solid var(--ink-faint);
+    rotate: 45deg;
+  }
+
   .navlist li + li a { border-top: 1px solid var(--rule); }
+
+  .navlist a:hover,
+  .navlist a[aria-current="true"] {
+    background: none;
+    color: var(--accent);
+  }
+
+  .navlist a[aria-current="true"]::after {
+    border-color: var(--accent);
+  }
+}
+
+@media (max-width: 60rem) and (prefers-reduced-motion: no-preference) {
+  .topbar__nav[data-open="true"] { animation: sheet-in var(--dur) var(--ease-out); }
+}
+
+@keyframes sheet-in {
+  from { opacity: 0; translate: 0 -0.75rem; }
 }
 
 /* =========================================================================
@@ -1141,13 +1220,126 @@ mark {
   overflow: hidden;
 }
 
+/* Letterboxed, not cropped: a gallery exists so the screenshot can be read,
+   and `cover` would slice the top and bottom off anything portrait-ish. */
 .viewer__media img,
+.viewer__media video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .viewer__media iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.viewer__media--icon {
+  display: grid;
+  place-items: center;
+  color: var(--ink-faint);
+}
+
+/* ---- Gallery: stage, strip, counts ---- */
+.viewer__gallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.viewer__caption {
+  font-size: var(--step--1);
+  color: var(--ink-muted);
+}
+
+.viewer__thumbs {
+  display: flex;
+  gap: var(--space-2xs);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  padding-block-end: var(--space-3xs);
+}
+
+.viewer__thumb {
+  position: relative;
+  flex: none;
+  width: 5.5rem;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper-sunken);
+  scroll-snap-align: start;
+  opacity: 0.62;
+  transition: opacity var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+
+.viewer__thumb:hover { opacity: 1; }
+
+.viewer__thumb[aria-current="true"] {
+  opacity: 1;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.viewer__thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border: none;
 }
+
+.viewer__thumbicon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--ink-faint);
+}
+
+/* Marks a clip in the strip, so the video/image split reads at a glance. */
+.viewer__thumbbadge {
+  position: absolute;
+  inset-block-end: 0.2rem;
+  inset-inline-end: 0.2rem;
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.viewer__gallerybar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  color: var(--ink-faint);
+}
+
+.viewer__count {
+  margin-inline-end: auto;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.viewer__gallerynav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3xs);
+}
+
+.viewer__position { font-variant-numeric: tabular-nums; }
+
+.iconbtn--sm { width: 2rem; height: 2rem; }
+.iconbtn--sm svg { width: 0.95rem; height: 0.95rem; }
 
 .viewer__head {
   display: flex;
@@ -1290,6 +1482,19 @@ mark {
     border-inline-start: none;
   }
   .viewer__body { padding: var(--space-m) var(--space-s) var(--space-2xl); }
+}
+
+/* =========================================================================
+   Phones — the first breakpoint that reclaims space rather than reflowing it
+   ========================================================================= */
+@media (max-width: 30rem) {
+  /* `/` is a keyboard shortcut, so on a phone the hint and the 5.5rem of
+     padding reserved for it only shrink the field. */
+  .search__hint { display: none; }
+  .search input { padding-inline-end: 2.75rem; }
+
+  .viewer__bar { padding-inline: var(--space-2xs); }
+  .viewer__thumb { width: 4.75rem; }
 }
 
 /* =========================================================================

@@ -1,6 +1,8 @@
 import { el, clear, $ } from '../dom.js';
 import { icon } from '../icons.js';
 import { track } from '../analytics.js';
+import { lockScroll, unlockScroll } from '../scroll-lock.js';
+import { embedUrl } from '../media.js';
 
 /**
  * Project detail viewer, built on a native <dialog>: top layer, backdrop, Esc
@@ -37,9 +39,13 @@ export function createViewer({ controller }) {
     if (!fromHash) opener = document.activeElement;
 
     render(project);
-    if (!dialog.open) dialog.showModal();
+    /* Stepping to a sibling re-enters open() on an already-open dialog; the
+       lock is ref-counted, so it must only be taken on the way in. */
+    if (!dialog.open) {
+      dialog.showModal();
+      lockScroll();
+    }
     scroll.scrollTop = 0;
-    document.body.style.overflow = 'hidden';
 
     setHash(`#project/${project.slug}`);
     updateNav();
@@ -55,7 +61,7 @@ export function createViewer({ controller }) {
   }
 
   dialog.addEventListener('close', () => {
-    document.body.style.overflow = '';
+    unlockScroll();
     current = null;
     clear(body); // stops any embedded video from playing on
     if (location.hash.startsWith('#project/')) setHash('');
@@ -100,8 +106,12 @@ export function createViewer({ controller }) {
   nextBtn.addEventListener('click', () => step(1));
 
   dialog.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
-    if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    /* Inside the gallery the arrows walk its items; the gallery handles them
+       first and this must not also jump to the next project. */
+    if (e.target.closest?.('[data-gallery]')) return;
+    e.preventDefault();
+    step(e.key === 'ArrowLeft' ? -1 : 1);
   });
 
   /* ------------------------------------------------------------ copy link -- */
@@ -244,73 +254,171 @@ export function createViewer({ controller }) {
   return { open, close, updateNav, handleHash };
 }
 
-/* ------------------------------------------------------------------ media -- */
-
-function renderMedia(project) {
-  const embed = embedUrl(project.links.demo);
-
-  if (embed) {
-    return el('div', { class: 'viewer__media' },
-      el('iframe', {
-        src: embed,
-        title: `${project.title} — demo video`,
-        loading: 'lazy',
-        allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
-        allowfullscreen: true,
-      }));
-  }
-
-  if (project.cover) {
-    return el('div', { class: 'viewer__media' },
-      el('img', { src: project.cover, alt: '', loading: 'lazy', decoding: 'async' }));
-  }
-
-  return null;
-}
+/* ---------------------------------------------------------------- gallery -- */
 
 /**
- * Turns a YouTube or Google Drive share link into an embeddable one.
+ * Stage plus thumbnail strip, in the shape of a store page: the strip shows at
+ * a glance how much there is and how it splits between clips and stills.
  *
- * The old implementation split on 'v=' and on '/d/' without checking the
- * result, so a URL carrying extra query params produced a broken id and a
- * Drive URL in any other shape threw outright. This returns null instead of
- * guessing, and the caller falls back to the cover image.
+ * The selected item is swapped by replacing the stage node rather than
+ * retargeting it, which is what stops a video the moment you move off it —
+ * the same trick the dialog's close handler relies on.
+ *
+ * State lives in this call's closure, so it resets on every open and cannot
+ * survive the re-render that follows a background data revalidation.
  */
-export function embedUrl(url) {
-  const raw = String(url || '').trim();
-  if (!raw) return null;
+function renderMedia(project) {
+  const items = project.media;
+  if (!items.length) return null;
 
-  let parsed;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    return null;
+  const gallery = el('div', { class: 'viewer__gallery', dataset: { gallery: '' } });
+  const stage = el('div', { class: 'viewer__media' });
+  const caption = el('p', { class: 'viewer__caption' });
+
+  let index = 0;
+  let position = null;
+  const thumbs = items.length > 1 ? items.map(thumbButton) : [];
+
+  function show(next, { focus = false } = {}) {
+    index = (next + items.length) % items.length;
+    const item = items[index];
+
+    clear(stage);
+    stage.classList.remove('viewer__media--icon');
+    stage.dataset.kind = item.kind;
+    stage.append(stageNode(item, project));
+
+    clear(caption);
+    caption.hidden = !item.caption;
+    if (item.caption) caption.append(item.caption);
+
+    thumbs.forEach((btn, i) => {
+      btn.setAttribute('aria-current', String(i === index));
+      if (i !== index || !btn.isConnected) return;
+      btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      if (focus) btn.focus();
+    });
+
+    if (position) {
+      clear(position);
+      position.append(`${index + 1} / ${items.length}`);
+    }
   }
 
-  const host = parsed.hostname.replace(/^www\./, '');
+  function thumbButton(item, i) {
+    const label = item.caption || `${item.kind === 'video' ? 'Video' : 'Image'} ${i + 1}`;
 
-  if (host === 'youtu.be') {
-    const id = parsed.pathname.slice(1).split('/')[0];
-    return id ? `https://www.youtube.com/embed/${id}` : null;
+    return el('button', {
+      class: `viewer__thumb viewer__thumb--${item.kind}`,
+      type: 'button',
+      'aria-label': label,
+      'aria-current': 'false',
+      on: { click: () => show(i) },
+    },
+    item.poster
+      ? el('img', {
+          src: item.poster,
+          alt: '',
+          loading: 'lazy',
+          decoding: 'async',
+          /* Replace only the image so the play badge above it survives. */
+          on: { error: (e) => e.target.replaceWith(thumbIcon(item.kind)) },
+        })
+      : thumbIcon(item.kind),
+    item.kind === 'video' ? el('span', { class: 'viewer__thumbbadge' }, icon('play', { size: 12 })) : null,
+    );
   }
 
-  if (host === 'youtube.com' || host === 'm.youtube.com') {
-    const id = parsed.searchParams.get('v')
-      || parsed.pathname.match(/^\/(?:embed|shorts|v)\/([^/?]+)/)?.[1];
-    return id ? `https://www.youtube.com/embed/${id}` : null;
+  gallery.append(stage, caption);
+
+  if (thumbs.length) {
+    position = el('span', { class: 'viewer__position' });
+
+    const prev = navButton('chevron-left', 'Previous item', () => show(index - 1));
+    const next = navButton('chevron-right', 'Next item', () => show(index + 1));
+
+    gallery.append(
+      el('div', { class: 'viewer__thumbs' }, thumbs),
+      el('div', { class: 'viewer__gallerybar' },
+        el('span', { class: 'viewer__count' }, countLabel(project.mediaCounts)),
+        el('span', { class: 'viewer__gallerynav' }, prev, position, next),
+      ),
+    );
+
+    /* Left/Right walk the gallery while it holds focus; the dialog-level
+       binding keeps them walking between projects everywhere else. A focused
+       <video> is left alone so its own seek shortcuts still work. */
+    gallery.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'VIDEO') return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      show(index + (e.key === 'ArrowLeft' ? -1 : 1), { focus: true });
+    });
   }
 
-  if (host === 'drive.google.com') {
-    const id = parsed.pathname.match(/\/d\/([^/]+)/)?.[1] || parsed.searchParams.get('id');
-    return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+  show(0);
+  return gallery;
+}
+
+function stageNode(item, project) {
+  if (item.render === 'embed') {
+    return el('iframe', {
+      src: item.src,
+      title: item.caption || `${project.title} — video`,
+      loading: 'lazy',
+      allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
+      allowfullscreen: true,
+    });
   }
 
-  if (host === 'vimeo.com') {
-    const id = parsed.pathname.split('/').filter(Boolean)[0];
-    return /^\d+$/.test(id || '') ? `https://player.vimeo.com/video/${id}` : null;
+  if (item.render === 'file') {
+    return el('video', {
+      src: item.src,
+      poster: item.poster || null,
+      controls: true,
+      playsinline: true,
+      preload: 'metadata',
+    });
   }
 
-  return null;
+  return el('img', {
+    src: item.src,
+    alt: item.alt || '',
+    loading: 'lazy',
+    decoding: 'async',
+    /* Same degradation as project cards: a dead source becomes an icon tile
+       rather than a browser's broken-image glyph. */
+    on: {
+      error: (e) => {
+        const wrap = e.target.parentElement;
+        if (!wrap) return;
+        clear(wrap);
+        wrap.classList.add('viewer__media--icon');
+        wrap.append(icon('image', { size: 36 }));
+      },
+    },
+  });
+}
+
+function thumbIcon(kind) {
+  return el('span', { class: 'viewer__thumbicon' },
+    icon(kind === 'video' ? 'play' : 'image', { size: 20 }));
+}
+
+function countLabel({ videos = 0, images = 0 } = {}) {
+  const parts = [];
+  if (videos) parts.push(`${videos} ${videos === 1 ? 'video' : 'videos'}`);
+  if (images) parts.push(`${images} ${images === 1 ? 'image' : 'images'}`);
+  return parts.join(' · ');
+}
+
+function navButton(name, label, onClick) {
+  return el('button', {
+    class: 'iconbtn iconbtn--sm',
+    type: 'button',
+    'aria-label': label,
+    on: { click: onClick },
+  }, icon(name, { size: 15 }));
 }
 
 /* ------------------------------------------------------------------ utils -- */

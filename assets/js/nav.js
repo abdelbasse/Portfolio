@@ -1,5 +1,6 @@
 import { el, clear, $, $$ } from './dom.js';
 import { icon } from './icons.js';
+import { lockScroll, unlockScroll } from './scroll-lock.js';
 
 /**
  * Builds the section nav from whichever sections actually rendered, keeps the
@@ -34,26 +35,57 @@ export function initNav() {
     );
   }
 
-  /* ---- mobile menu ---- */
+  /* ---- mobile sheet ---- */
   if (menuBtn && navPanel) {
-    navPanel.id = 'section-nav';
-    clear(menuBtn);
-    menuBtn.append(icon('menu', { size: 18 }));
+    /* Marked inert while the sheet is up, which traps Tab inside it without
+       hand-rolling a focus cycle. The topbar stays reachable on purpose, so
+       the theme toggle and the close button are still in the tab order. */
+    const behind = [$('#main'), $('.footer')].filter(Boolean);
 
-    const setOpen = (open) => {
+    const isOpen = () => navPanel.dataset.open === 'true';
+
+    const setOpen = (open, { restoreFocus = true } = {}) => {
+      if (open === isOpen()) return;
+
       navPanel.dataset.open = String(open);
       menuBtn.setAttribute('aria-expanded', String(open));
       clear(menuBtn);
       menuBtn.append(icon(open ? 'x' : 'menu', { size: 18 }));
+      behind.forEach((node) => { node.inert = open; });
+
+      if (open) {
+        lockScroll();
+        navList.querySelector('a')?.focus();
+      } else {
+        unlockScroll();
+        if (restoreFocus) menuBtn.focus();
+      }
     };
 
-    setOpen(false);
-    menuBtn.addEventListener('click', () => setOpen(navPanel.dataset.open !== 'true'), { signal });
+    /* A background revalidation re-enters initNav and rebuilds the links, so
+       release whatever the previous run was still holding before resetting. */
+    if (isOpen()) unlockScroll();
+
+    navPanel.dataset.open = 'false';
+    menuBtn.setAttribute('aria-expanded', 'false');
+    clear(menuBtn);
+    menuBtn.append(icon('menu', { size: 18 }));
+    behind.forEach((node) => { node.inert = false; });
+
+    menuBtn.addEventListener('click', () => setOpen(!isOpen()), { signal });
     navList.addEventListener('click', (e) => {
-      if (e.target.closest('a')) setOpen(false);
+      if (e.target.closest('a')) setOpen(false, { restoreFocus: false });
     }, { signal });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && navPanel.dataset.open === 'true') setOpen(false);
+      if (e.key === 'Escape' && isOpen()) setOpen(false);
+    }, { signal });
+
+    /* Rotating to landscape crosses the breakpoint and hides the toggle;
+       without this the sheet stays flagged open behind a display:none button
+       and the page stays locked. */
+    const wide = window.matchMedia('(min-width: 60.0625rem)');
+    wide.addEventListener('change', (e) => {
+      if (e.matches) setOpen(false, { restoreFocus: false });
     }, { signal });
   }
 
